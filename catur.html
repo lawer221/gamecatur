@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<title>Game Catur - Classic Wood</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<style>
+    body {
+        margin: 0;
+        height: 100vh;
+        background: radial-gradient(#3b2a1a, #1e140c);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: "Georgia", serif;
+        color: #f5f5f5;
+    }
+
+    #game {
+        text-align: center;
+    }
+
+    h3 {
+        margin-bottom: 10px;
+        letter-spacing: 1px;
+    }
+
+    #board {
+        display: grid;
+        grid-template-columns: repeat(8, min(11vw, 64px));
+        grid-template-rows: repeat(8, min(11vw, 64px));
+        border: 6px solid #6b3e1e;
+        box-shadow: inset 0 0 20px rgba(0,0,0,0.6),
+                    0 10px 30px rgba(0,0,0,0.7);
+        touch-action: manipulation;
+    }
+
+    .cell {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-size: min(7.5vw, 40px);
+        user-select: none;
+        -webkit-tap-highlight-color: transparent;
+    }
+
+    /* WARNA PAPAN KAYU */
+    .light {
+        background: linear-gradient(#e6c89a, #d2b48c);
+    }
+
+    .dark {
+        background: linear-gradient(#8b5a2b, #6f3f1d);
+    }
+
+    /* BIDAK */
+    .piece-white {
+        color: #fff;
+        text-shadow: 0 2px 3px rgba(0,0,0,0.6);
+    }
+
+    .piece-black {
+        color: #111;
+        text-shadow: 0 2px 3px rgba(255,255,255,0.2);
+    }
+
+    /* INTERAKSI TOUCH */
+    .selected {
+        box-shadow: inset 0 0 0 4px rgba(255,0,0,0.8);
+    }
+
+    .move {
+        box-shadow: inset 0 0 0 4px rgba(0,255,0,0.6);
+    }
+</style>
+</head>
+<body>
+
+<div id="game">
+    <h3>♟️ Classic Wood Chess</h3>
+    <div id="board"></div>
+    <p id="turn">Giliran: Putih</p>
+</div>
+
+<script>
+<script>
+const boardEl = document.getElementById("board");
+const turnEl = document.getElementById("turn");
+
+let turn = "white";
+let selected = null;
+let moves = [];
+
+const pieces = {
+    r:"♜", n:"♞", b:"♝", q:"♛", k:"♚", p:"♟",
+    R:"♖", N:"♘", B:"♗", Q:"♕", K:"♔", P:"♙"
+};
+
+let board = [
+ ["r","n","b","q","k","b","n","r"],
+ ["p","p","p","p","p","p","p","p"],
+ ["","","","","","","",""],
+ ["","","","","","","",""],
+ ["","","","","","","",""],
+ ["","","","","","","",""],
+ ["P","P","P","P","P","P","P","P"],
+ ["R","N","B","Q","K","B","N","R"]
+];
+
+function isWhite(p){ return p === p.toUpperCase(); }
+function isBlack(p){ return p === p.toLowerCase(); }
+
+function drawBoard(){
+    boardEl.innerHTML="";
+    for(let r=0;r<8;r++){
+        for(let c=0;c<8;c++){
+            const cell=document.createElement("div");
+            cell.className="cell "+((r+c)%2===0?"light":"dark");
+            cell.dataset.r=r;
+            cell.dataset.c=c;
+
+            if(board[r][c]){
+                const span=document.createElement("span");
+                span.textContent=pieces[board[r][c]];
+                span.className=isWhite(board[r][c])?"piece-white":"piece-black";
+                cell.appendChild(span);
+            }
+
+            cell.onclick=()=>tap(cell);
+            boardEl.appendChild(cell);
+        }
+    }
+}
+
+function tap(cell){
+    const r=+cell.dataset.r;
+    const c=+cell.dataset.c;
+    clear();
+
+    if(!selected){
+        const p=board[r][c];
+        if(p && ((turn==="white" && isWhite(p)) || (turn==="black" && isBlack(p)))){
+            selected={r,c};
+            cell.classList.add("selected");
+            navigator.vibrate?.(30);
+            moves=getMoves(r,c,p);
+            moves.forEach(m=>highlight(m.r,m.c));
+        }
+    } else {
+        if(moves.some(m=>m.r===r && m.c===c)){
+            board[r][c]=board[selected.r][selected.c];
+            board[selected.r][selected.c]="";
+            turn = turn==="white"?"black":"white";
+            turnEl.textContent="Giliran: "+(turn==="white"?"Putih":"Hitam");
+        }
+        selected=null;
+        moves=[];
+        drawBoard();
+    }
+}
+
+function getMoves(r,c,p){
+    const result=[];
+    const dir = isWhite(p) ? -1 : 1;
+
+    if(p.toLowerCase()==="p"){
+        if(board[r+dir]?.[c]==="") result.push({r:r+dir,c});
+        if((r===6 && isWhite(p)) || (r===1 && isBlack(p))){
+            if(board[r+dir]?.[c]==="" && board[r+2*dir]?.[c]==="")
+                result.push({r:r+2*dir,c});
+        }
+        for(let dc of [-1,1]){
+            if(board[r+dir]?.[c+dc] &&
+               isWhite(p)!==isWhite(board[r+dir][c+dc]))
+                result.push({r:r+dir,c:c+dc});
+        }
+    }
+
+    if(p.toLowerCase()==="n"){
+        [[2,1],[2,-1],[-2,1],[-2,-1],[1,2],[1,-2],[-1,2],[-1,-2]]
+        .forEach(d=>{
+            const nr=r+d[0], nc=c+d[1];
+            if(board[nr]?.[nc]===undefined) return;
+            if(board[nr][nc]==="" || isWhite(p)!==isWhite(board[nr][nc]))
+                result.push({r:nr,c:nc});
+        });
+    }
+
+    if("rbq".includes(p.toLowerCase())){
+        const dirs=[];
+        if("rq".includes(p.toLowerCase())) dirs.push([1,0],[-1,0],[0,1],[0,-1]);
+        if("bq".includes(p.toLowerCase())) dirs.push([1,1],[1,-1],[-1,1],[-1,-1]);
+
+        dirs.forEach(d=>{
+            let nr=r+d[0], nc=c+d[1];
+            while(board[nr]?.[nc]!==undefined){
+                if(board[nr][nc]===""){
+                    result.push({r:nr,c:nc});
+                } else {
+                    if(isWhite(p)!==isWhite(board[nr][nc]))
+                        result.push({r:nr,c:nc});
+                    break;
+                }
+                nr+=d[0]; nc+=d[1];
+            }
+        });
+    }
+
+    if(p.toLowerCase()==="k"){
+        for(let dr=-1;dr<=1;dr++){
+            for(let dc=-1;dc<=1;dc++){
+                if(dr===0 && dc===0) continue;
+                const nr=r+dr, nc=c+dc;
+                if(board[nr]?.[nc]===undefined) continue;
+                if(board[nr][nc]==="" || isWhite(p)!==isWhite(board[nr][nc]))
+                    result.push({r:nr,c:nc});
+            }
+        }
+    }
+
+    return result;
+}
+
+function highlight(r,c){
+    [...boardEl.children].forEach(cell=>{
+        if(cell.dataset.r==r && cell.dataset.c==c)
+            cell.classList.add("move");
+    });
+}
+
+function clear(){
+    document.querySelectorAll(".selected,.move")
+        .forEach(e=>e.classList.remove("selected","move"));
+}
+
+drawBoard();
+</script>
+</body>
+</html>
